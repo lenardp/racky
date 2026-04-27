@@ -50,6 +50,10 @@ bower.json
 # Ignore Byebug command history file.
 .byebug_history
 
+# Ignore Vim swap files
+*.swp
+*.swo
+
 # Ignore node_modules
 node_modules/
 
