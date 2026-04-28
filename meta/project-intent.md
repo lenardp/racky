@@ -1,186 +1,123 @@
-# Project intent
+# Project Intent
 
-*Initial Prompt/context for Claude Code to read*
+Racky is an app where users store photos of their garments and get outfit suggestions. Outfit suggestions follow two principles:
 
-The goal of this project is a simple app called Racky that stores images of a user's
-garments and suggest outfits based on those garments.
+- **High cohesion** — most pieces share a lot of tags in common
+- **A little POP** — a few pieces sharply contrast with the rest
 
-Outfit suggestion is basically based on the following principles:
-* **High cohesion** - most/all pieces have a lot in common
-* **A little POP** - Some pieces sharply stand out
+---
 
-## For inspiration
+## Architecture Overview
 
-see the previous attempt at making Racky, at ../racky-old/
+Event-driven microservices, all dockerized. Stack: Ruby on Rails, Node.js, React.js, Python, Kafka, MySQL, AWS S3, Claude API.
 
-## High level architecture
+### Services
 
-It is to be a small ecosystem of event-driven microservices.
+| Service | Stack | Role |
+|---|---|---|
+| **racky-gateway** | Node.js / Express | Lean API gateway — all HTTP traffic goes through here |
+| **racky-lookbook** | React.js | Frontend |
+| **racky-monolith** | Ruby on Rails / MySQL | Core data, auth, outfit generation |
+| **racky-tagger** | Python | Talks to Claude API to tag garments |
 
-I'm thinking:
-* Made of Ruby on Rails, Node.js, React.js, Kafka, Claude, MySQL and maybe AWS S3?
-* Microservice called **racky-gateway** - A lean API Gateway in front of everything.
-  * Made of Node.js
-  * All Racky HTTP requests are to the API gateway
-* Microservice called **racky-lookbook** - react.js frontend
-* Microservice called **racky-tagger** - for talking to Claude API to tag garments
-  * made of python (django?)
-* "Microservice" called **racky-monolith**
-  * made of ruby on rails with mysql db
-  * especially for storing garment data and generating outfits, but also authentication and whatever else
-  * honestly this isn't actually very micro since I think it doesn't make much sense to put user authentication data anywhere else... right?
-  * I'm going off the principal of "go monolith for speed, but split off as soon as you can".
-    * this isn't really a monolith, but
-  * should be structured such that outfit generation can be pulled into a separate service if we want.
-* This is primarily an event-driven microservices architecture
-* events implemented by kafka queues.  We'll start with two for now
-  * one called "New Garments", and one called "Tagged Garments"
-* each service is dockerized
+### Kafka Queues
+
+- **Untagged Garments** — triggered when a new garment is uploaded
+- **Tagged Garments** — triggered when racky-tagger finishes analyzing a garment
+
+---
 
 ## racky-gateway
 
-* very lean and simple node.js app
-* Endpoints:
-  * /api/v1 - a REST API
-    * /garments
-      * POST
-      * PUT
-      * GET
-      * DELETE
-      * all directed to racky-closet
-    * /outfits
-      * /generate - Generates an outfit (not saved to db)
-      * directed to racky-closet
-  * /ping
-  * Everything else
-    * directed to racky-lookbook
-* use Express and axios
+Thin Node.js/Express proxy. Routes:
+
+- `GET/POST/PUT/DELETE /api/v1/garments` → racky-monolith
+- `POST /api/v1/outfits/generate` → racky-monolith
+- `/ping`
+- Everything else → racky-lookbook
+
+---
 
 ## racky-lookbook
 
-* I don't have too many opinions about react.js
-* I remember Top Hat (tophatmonocle) had a react pattern called "ducks" or something
-  * and they also used sagas
-  * let's do that for this microservice
-* see ../racky-old/racky-dover/ for code styling/formatting inspiration
-* frontend components hit the API gateway of course
-* should only have the following pages
-  * login
-  * home page that links to the garment upload and outfit generator
-  * garment upload page (where user can take pics with their phone and upload it to racky)
-  * outfit generator page
+React frontend using the "ducks" pattern with sagas (inspired by `../racky-old/racky-dover/`). Four pages:
+
+- Login
+- Home (links to garment upload and outfit generator)
+- Garment upload (mobile-friendly photo upload)
+- Outfit generator
+
+---
 
 ## racky-monolith
 
-* instead of the typical ruby on rails directory structure, it divides the app into domains
-  * so if anything should be split into another microservice, it should be easy to do
-  * Domains should barelly use each other's classes, so they're easier to piece apart later.
-* directory structure
-  * apps/
-    * closets/
-      * controllers/
-      * models/
-      * services/
-      * tests/
-    * accounts/
-      * controllers/
-      * models/
-      * services/
-      * tests/
-  * config/
-  * lib/
-  * db/
-  * ...etc.  I just wanted to illustrate that apps should split controllers, models, tests, etc. by domain
-* models
-  * under closets/
-    * Garment - a specific piece of clothing
-      * id - a UUID
-      * image_url - URL to an image of the garment.  nullable
-      * name - nullable
-      * layer - an integer 1-4 describing how you layer it with other pieces.  greater numbers go over lesser number
-        * 1 - base or "under" layer, like a t-shirt, leggings, or rings
-        * 2 - can be worn alone, or have a layer underneath, like a button-up or a dress
-        * 3 - primarily for going over other layers, like jackets
-        * 4 - outerwear only, like winter jackets
-      * user_id - id of the user owning this
-    * Tag - A word/term describing the garment, vibe-wise.  Examples
-      * blue
-      * cool-coloured
-      * denim
-      * americana
-      * punk
-      * formal
-      * grunge
-      * tiger-print
-      * graphic-print
-      * soft
-      * oversized
-      * techwear
-      * 90's
-      * basketball
-      * streetwear
-      * running
-      * light
-      * dark
-      * tough
-      * basic
-    * TagContrast - join table between tags to show that these are in sharp contrast
-      * light & dark
-      * cool & warm
-      * formal & casual
-      * tough & soft
-      * oversized & skinny
-      * wide & narrow
-    * GarmentTag - Join table between Garment and Tag to describe the vibe of a garment
-    * BodyZoneGarment - Join table between BodyZone and Garment to show the parts of the body a garment would be worn over.
-      * A dress would be worn over torso and legs, for example
-    * BodyZone - body parts a garment can be worn over.  Rows:
-      * torso
-      * legs
-      * feet
-      * head
-      * neck
-      * hands
-  * under accounts/
-    * user
-    * ...well it should be obvious from here.  you can fill that in, Claude.
-* when `POST /api/v1/garments` triggers a call to racky-monolith, we should
-  * create a Garment record for this User.
-    * blank photo, layer and name for now
-    * no tags nor body zones identified for now
-  * pass all the given garment information into the "Untagged Garments" kafka queue
-* Should also listen to the "Tagged Garments" kafka queue. each event would describe
-  * a name for the garment
-  * all tags that apply
-  * what layer to apply to it
-  * all body zones it is worn over
-* Mysql database
-* when `POST /api/v1/outfit/generate` triggers a call to racky-monolith, we should put together an outfit using the pieces in the user's wardrobe, using tags
-  * (theoretically ai could do outfit generation as well, but i'm tryna save on tokens)
-  * All pieces combined should cover at least the basics of the body:
-    * torso has at least a layer 1 or 2
-    * Legs have at least a layer 1 or 2
-    * feet have at least a layer 2 (shoes).
-  * **High cohesion** - There should be a lot of tags in common amongst garments
-  * **A little POP** - a few tags have a TagContrast with the common tags
-  * can add accessories to help with the high cohesion x little POP ratios
-  * list all garments of the outfitin the response
+Rails app organized by domain instead of the default Rails structure, so domains can be split into separate services later. Domains should barely touch each other's classes.
+
+### Directory structure
+
+```
+apps/
+  closets/
+    controllers/
+    models/
+    services/
+    tests/
+  accounts/
+    controllers/
+    models/
+    services/
+    tests/
+config/
+lib/
+db/
+```
+
+### Models
+
+**closets domain**
+
+- **Garment** — a piece of clothing
+  - `id` (UUID), `image_url` (nullable), `name` (nullable), `layer` (1–4), `user_id`
+  - Layer scale: 1 = base (t-shirt, leggings), 2 = standalone (button-up, dress), 3 = over layers (jacket), 4 = outerwear only (winter coat)
+- **Tag** — a vibe descriptor (e.g. `blue`, `denim`, `punk`, `oversized`, `techwear`, `streetwear`, `90's`, `formal`, `dark`, `soft`, ...)
+- **TagContrast** — pairs of contrasting tags (e.g. light/dark, cool/warm, formal/casual, tough/soft, oversized/skinny, wide/narrow)
+- **GarmentTag** — join: Garment ↔ Tag
+- **BodyZone** — `torso`, `legs`, `feet`, `head`, `neck`, `hands`
+- **BodyZoneGarment** — join: Garment ↔ BodyZone
+
+**accounts domain**
+
+- **User** — standard auth fields (id, email, password digest, timestamps)
+- **Session** / token handling as needed
+
+### Behavior
+
+**On `POST /api/v1/garments`:**
+1. Create a bare Garment record (no tags, no body zones yet)
+2. Push garment info to the **Untagged Garments** queue
+
+**On `Tagged Garments` event:**
+- Update the Garment with name, layer, tags, and body zones from the event
+
+**On `POST /api/v1/outfits/generate`:**
+Build an outfit from the user's wardrobe using tag logic (no AI — saving tokens):
+
+- Must cover the basics: torso (layer 1 or 2), legs (layer 1 or 2), feet (layer 2+)
+- **High cohesion** — many tags in common across pieces
+- **A little POP** — a few pieces have tags that contrast (via TagContrast) with the dominant tags
+- Accessories can be added to tune cohesion/POP balance
+- Response lists all garments in the outfit
+
+---
 
 ## racky-tagger
 
-* made of python (django?)
-* stores a copy of the list of tags either as another db, or maybe a simple list file
-* listens to the "Untagged Garments" queue for events.  when event received (with Garment information)
-  * uploads photo of garment to S3
-  * sends a prompt to claude which includes
-    * photo of garment
-    * asks for
-      * layer number
-      * tags that apply
-      * body zones it is worn over
-    * list of all possible tags for it to choose from
-    * quick explanation of layer number
-    * list of all possible body zones
-    * asks for the response format to be in JSON
-  * extracts that ^ info from the response.
-  * sends the Garment's complete information down throught eh "Tagged Garment" kafka event queue.
+Python service that listens to the **Untagged Garments** queue. On each event:
+
+1. Upload garment photo to S3
+2. Send a Claude prompt with the photo, asking for:
+   - Layer number
+   - Applicable tags (from the known tag list)
+   - Body zones covered
+   - Response in JSON
+3. Parse the response and publish to the **Tagged Garments** queue
