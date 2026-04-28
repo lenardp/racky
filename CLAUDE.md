@@ -8,6 +8,5 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Code Style and Architecture
 
-Read `meta/style-guidelines.md` for coding style guidelines.
-
-Read `meta/service-example.rb` for the canonical service pattern, which governs how all business logic is structured.
+Read `meta/style-guidelines.md` for ruby coding style guidelines.
+Read `meta/service-example.rb` for the canonical ruby service pattern, which governs how all business logic is structured.
