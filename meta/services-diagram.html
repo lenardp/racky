@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Racky — Services & Kafka</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      background: #0f1117;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    h1 {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+    .mermaid {
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <h1>Racky — Services &amp; Kafka Event Flow</h1>
+
+  <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "background":        "#0f1117",
+    "primaryColor":      "#1e293b",
+    "primaryTextColor":  "#e2e8f0",
+    "primaryBorderColor":"#334155",
+    "lineColor":         "#475569",
+    "secondaryColor":    "#141820",
+    "tertiaryColor":     "#141820",
+    "fontSize":          "14px"
+  }
+}}%%
+
+flowchart LR
+
+  %% ── Services ──────────────────────────────────
+  mannequin["🧍 racky-mannequin\naccounts · auth"]
+  closet["👕 racky-closet\ngarments · tags"]
+  stylist["✨ racky-stylist\noutfit generation"]
+  tagger["🤖 racky-tagger\nClaude API · S3"]
+
+  %% ── Kafka Topics ───────────────────────────────
+  GU(["📨 garment.uploaded"])
+  GT(["📨 garment.tagged"])
+  GD(["📨 garment.deleted"])
+  UD(["📨 user.deleted"])
+  OS(["📨 outfit.saved"])
+
+  %% ── Produce ────────────────────────────────────
+  closet    -- produces --> GU
+  closet    -- produces --> GD
+  tagger    -- produces --> GT
+  mannequin -- produces --> UD
+  stylist   -- produces --> OS
+
+  %% ── Consume ────────────────────────────────────
+  GU -- consumes --> tagger
+  GT -- consumes --> closet
+  GT -- consumes --> stylist
+  GD -- consumes --> stylist
+  UD -- consumes --> closet
+  UD -- consumes --> stylist
+
+  %% ── Styles ─────────────────────────────────────
+  classDef service  fill:#1e293b,stroke:#334155,color:#e2e8f0,rx:8
+  classDef topic    fill:#1c1108,stroke:#92400e,color:#f97316,rx:20
+
+  class mannequin,closet,stylist,tagger service
+  class GU,GT,GD,UD,OS topic
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</body>
+</html>

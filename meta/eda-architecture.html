@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Racky — EDA Architecture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      padding: 40px;
+      min-width: 1100px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 6px;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-bottom: 40px;
+    }
+
+    /* ── Layout ─────────────────────────────────────── */
+
+    .diagram {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+
+    .row {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 16px;
+      position: relative;
+    }
+
+    .connector-v {
+      display: flex;
+      justify-content: center;
+      height: 36px;
+      align-items: stretch;
+    }
+
+    .connector-v .line {
+      width: 2px;
+      background: #334155;
+      position: relative;
+    }
+
+    .connector-v .line::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid #334155;
+    }
+
+    .connector-v .label {
+      font-size: 0.65rem;
+      color: #475569;
+      white-space: nowrap;
+      align-self: center;
+      margin-left: 6px;
+    }
+
+    /* ── Cards ──────────────────────────────────────── */
+
+    .card {
+      border-radius: 10px;
+      border: 1.5px solid;
+      padding: 14px 16px;
+      min-width: 170px;
+      max-width: 230px;
+      flex: 1;
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .card-stack {
+      font-size: 0.65rem;
+      color: #94a3b8;
+      margin-bottom: 10px;
+    }
+
+    .card-items {
+      list-style: none;
+      font-size: 0.7rem;
+      line-height: 1.7;
+      color: #cbd5e1;
+    }
+
+    .card-items li::before {
+      content: '· ';
+      color: #475569;
+    }
+
+    /* Colors */
+    .c-gateway  { border-color: #3b82f6; }
+    .c-gateway .card-title { color: #3b82f6; }
+
+    .c-frontend { border-color: #06b6d4; }
+    .c-frontend .card-title { color: #06b6d4; }
+
+    .c-accounts { border-color: #f59e0b; }
+    .c-accounts .card-title { color: #f59e0b; }
+
+    .c-closet   { border-color: #10b981; }
+    .c-closet .card-title { color: #10b981; }
+
+    .c-stylist  { border-color: #a855f7; }
+    .c-stylist .card-title { color: #a855f7; }
+
+    .c-tagger   { border-color: #ef4444; }
+    .c-tagger .card-title { color: #ef4444; }
+
+    .c-external { border-color: #475569; }
+    .c-external .card-title { color: #94a3b8; }
+
+    /* ── Kafka Bus ──────────────────────────────────── */
+
+    .kafka-bus {
+      margin: 0 auto;
+      width: 100%;
+      max-width: 900px;
+      border: 1.5px solid #1e293b;
+      border-radius: 10px;
+      background: #141820;
+      padding: 16px 24px;
+    }
+
+    .kafka-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #f97316;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kafka-title::before, .kafka-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #1e293b;
+    }
+
+    .kafka-topics {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .topic {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 0.68rem;
+      color: #f97316;
+      font-family: 'Courier New', monospace;
+    }
+
+    .topic .topic-subs {
+      font-size: 0.6rem;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .topic .topic-subs span {
+      color: #94a3b8;
+    }
+
+    /* ── Arrows between rows ────────────────────────── */
+
+    .arrow-row {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      height: 44px;
+      align-items: center;
+      position: relative;
+    }
+
+    .arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      flex: 1;
+      max-width: 230px;
+    }
+
+    .arrow .arrow-label {
+      font-size: 0.6rem;
+      color: #475569;
+      white-space: nowrap;
+    }
+
+    .arrow .arrow-shaft {
+      width: 2px;
+      flex: 1;
+      background: #334155;
+      position: relative;
+    }
+
+    .arrow.down .arrow-shaft::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid #334155;
+    }
+
+    .arrow.up .arrow-shaft::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 6px solid #334155;
+    }
+
+    .arrow.both .arrow-shaft::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 6px solid #334155;
+    }
+
+    .arrow.both .arrow-shaft::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid #334155;
+    }
+
+    /* ── Routes Table ───────────────────────────────── */
+
+    .section {
+      margin-top: 48px;
+    }
+
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #475569;
+      margin-bottom: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+    }
+
+    thead tr {
+      background: #1e293b;
+    }
+
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: #94a3b8;
+      letter-spacing: 0.05em;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #1e293b;
+    }
+
+    tbody tr:hover {
+      background: #141820;
+    }
+
+    tbody td {
+      padding: 9px 14px;
+      color: #cbd5e1;
+      vertical-align: top;
+    }
+
+    code {
+      font-family: 'Courier New', monospace;
+      background: #1e293b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      color: #a5b4fc;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .badge-get    { background: #052e16; color: #4ade80; }
+    .badge-post   { background: #0c1a3a; color: #60a5fa; }
+    .badge-put    { background: #2d1b00; color: #fb923c; }
+    .badge-delete { background: #2d0a0a; color: #f87171; }
+
+    .dest-accounts { color: #f59e0b; }
+    .dest-closet   { color: #10b981; }
+    .dest-stylist  { color: #a855f7; }
+
+    .note {
+      font-size: 0.65rem;
+      color: #475569;
+      font-style: italic;
+    }
+
+    /* ── Events Table ───────────────────────────────── */
+
+    .event-name {
+      font-family: 'Courier New', monospace;
+      color: #f97316;
+    }
+
+    /* ── Legend ─────────────────────────────────────── */
+
+    .legend {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.65rem;
+      color: #94a3b8;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Racky — Event-Driven Architecture</h1>
+  <p class="subtitle">Decomposed from monolith · Kafka event bus · No inter-service HTTP at runtime</p>
+
+  <!-- ── DIAGRAM ──────────────────────────────────────────────────── -->
+
+  <div class="diagram">
+
+    <!-- Row 0: Frontend + Gateway -->
+    <div class="row">
+      <div class="card c-frontend">
+        <div class="card-title">racky-lookbook</div>
+        <div class="card-stack">React.js · ducks + sagas</div>
+        <ul class="card-items">
+          <li>Login page</li>
+          <li>Home / dashboard</li>
+          <li>Garment upload</li>
+          <li>Outfit generator</li>
+        </ul>
+      </div>
+
+      <div style="display:flex;align-items:center;padding:0 4px;font-size:0.8rem;color:#334155;">⟷</div>
+
+      <div class="card c-gateway">
+        <div class="card-title">racky-gateway</div>
+        <div class="card-stack">Node.js · Express</div>
+        <ul class="card-items">
+          <li>All inbound HTTP</li>
+          <li>JWT validation</li>
+          <li>Route → service</li>
+          <li>Static → lookbook</li>
+          <li>No Kafka access</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Arrows: gateway → services -->
+    <div class="arrow-row" style="max-width:860px;margin:0 auto;width:100%;">
+      <div class="arrow down" style="max-width:200px;">
+        <div class="arrow-label">HTTP (sync)</div>
+        <div class="arrow-shaft" style="height:24px;"></div>
+      </div>
+      <div class="arrow down" style="max-width:200px;">
+        <div class="arrow-label">HTTP (sync)</div>
+        <div class="arrow-shaft" style="height:24px;"></div>
+      </div>
+      <div class="arrow down" style="max-width:200px;">
+        <div class="arrow-label">HTTP (sync)</div>
+        <div class="arrow-shaft" style="height:24px;"></div>
+      </div>
+    </div>
+
+    <!-- Row 1: Backend services -->
+    <div class="row">
+      <div class="card c-accounts">
+        <div class="card-title">racky-accounts</div>
+        <div class="card-stack">Ruby on Rails · MySQL</div>
+        <ul class="card-items">
+          <li>Register / login / logout</li>
+          <li>JWT issuance</li>
+          <li>User profile (GET /me)</li>
+          <li>Publishes user.deleted</li>
+        </ul>
+      </div>
+
+      <div class="card c-closet">
+        <div class="card-title">racky-closet</div>
+        <div class="card-stack">Ruby on Rails · MySQL</div>
+        <ul class="card-items">
+          <li>Garment CRUD</li>
+          <li>Tags + body zones</li>
+          <li>Serves GET /tags</li>
+          <li>Publishes garment.uploaded</li>
+          <li>Publishes garment.deleted</li>
+          <li>Consumes garment.tagged</li>
+          <li>Consumes user.deleted</li>
+        </ul>
+      </div>
+
+      <div class="card c-stylist">
+        <div class="card-title">racky-stylist</div>
+        <div class="card-stack">Ruby on Rails · MySQL</div>
+        <ul class="card-items">
+          <li>Outfit generation</li>
+          <li>Saved outfit history</li>
+          <li>Own garment read model</li>
+          <li>Consumes garment.tagged</li>
+          <li>Consumes garment.deleted</li>
+          <li>Consumes user.deleted</li>
+          <li>Publishes outfit.saved</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Arrows: services → kafka -->
+    <div class="arrow-row" style="max-width:860px;margin:0 auto;width:100%;">
+      <div class="arrow both" style="max-width:200px;">
+        <div class="arrow-shaft" style="height:24px;"></div>
+        <div class="arrow-label">produce / consume</div>
+      </div>
+      <div class="arrow both" style="max-width:200px;">
+        <div class="arrow-shaft" style="height:24px;"></div>
+        <div class="arrow-label">produce / consume</div>
+      </div>
+      <div class="arrow both" style="max-width:200px;">
+        <div class="arrow-shaft" style="height:24px;"></div>
+        <div class="arrow-label">produce / consume</div>
+      </div>
+    </div>
+
+    <!-- Kafka Bus -->
+    <div class="kafka-bus">
+      <div class="kafka-title">Kafka Event Bus</div>
+      <div class="kafka-topics">
+
+        <div class="topic">
+          garment.uploaded
+          <div class="topic-subs">producer: <span>racky-closet</span></div>
+          <div class="topic-subs">consumer: <span>racky-tagger</span></div>
+        </div>
+
+        <div class="topic">
+          garment.tagged
+          <div class="topic-subs">producer: <span>racky-tagger</span></div>
+          <div class="topic-subs">consumer: <span>racky-closet, racky-stylist</span></div>
+        </div>
+
+        <div class="topic">
+          garment.deleted
+          <div class="topic-subs">producer: <span>racky-closet</span></div>
+          <div class="topic-subs">consumer: <span>racky-stylist</span></div>
+        </div>
+
+        <div class="topic">
+          user.deleted
+          <div class="topic-subs">producer: <span>racky-accounts</span></div>
+          <div class="topic-subs">consumer: <span>racky-closet, racky-stylist</span></div>
+        </div>
+
+        <div class="topic">
+          outfit.saved
+          <div class="topic-subs">producer: <span>racky-stylist</span></div>
+          <div class="topic-subs">consumer: <span>—&nbsp; (extensible)</span></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Arrows: kafka → tagger -->
+    <div class="arrow-row" style="max-width:860px;margin:0 auto;width:100%;justify-content:flex-start;padding-left:30px;">
+      <div class="arrow both" style="max-width:200px;">
+        <div class="arrow-shaft" style="height:24px;"></div>
+        <div class="arrow-label">produce / consume</div>
+      </div>
+    </div>
+
+    <!-- Row 2: Tagger + Externals -->
+    <div class="row" style="justify-content:flex-start;gap:16px;">
+      <div class="card c-tagger">
+        <div class="card-title">racky-tagger</div>
+        <div class="card-stack">Python</div>
+        <ul class="card-items">
+          <li>Consumes garment.uploaded</li>
+          <li>Uploads image → S3</li>
+          <li>Calls Claude API</li>
+          <li>Parses JSON response</li>
+          <li>Publishes garment.tagged</li>
+          <li>DLQ on parse failure</li>
+        </ul>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;justify-content:center;">
+        <div style="font-size:0.65rem;color:#334155;">→ S3 upload</div>
+        <div style="font-size:0.65rem;color:#334155;">→ Claude API</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="card c-external" style="min-width:130px;max-width:160px;">
+          <div class="card-title">AWS S3</div>
+          <div class="card-stack">Object storage</div>
+          <ul class="card-items">
+            <li>Garment images</li>
+          </ul>
+        </div>
+        <div class="card c-external" style="min-width:130px;max-width:160px;">
+          <div class="card-title">Claude API</div>
+          <div class="card-stack">Anthropic</div>
+          <ul class="card-items">
+            <li>Tags garment</li>
+            <li>Layer detection</li>
+            <li>Body zones</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /diagram -->
+
+  <!-- ── ROUTES TABLE ──────────────────────────────────────────────── -->
+
+  <div class="section">
+    <div class="section-title">Gateway Routes</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Path</th>
+          <th>Routes to</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr>
+          <td><span class="badge badge-post">POST</span></td>
+          <td><code>/api/v1/auth/register</code></td>
+          <td><span class="dest-accounts">racky-accounts</span></td>
+          <td>Sync — returns JWT</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-post">POST</span></td>
+          <td><code>/api/v1/auth/login</code></td>
+          <td><span class="dest-accounts">racky-accounts</span></td>
+          <td>Sync — returns JWT</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-delete">DELETE</span></td>
+          <td><code>/api/v1/auth/logout</code></td>
+          <td><span class="dest-accounts">racky-accounts</span></td>
+          <td>Invalidates session/token</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-get">GET</span></td>
+          <td><code>/api/v1/users/me</code></td>
+          <td><span class="dest-accounts">racky-accounts</span></td>
+          <td></td>
+        </tr>
+
+        <tr style="border-top:2px solid #1e293b;">
+          <td><span class="badge badge-get">GET</span></td>
+          <td><code>/api/v1/garments</code></td>
+          <td><span class="dest-closet">racky-closet</span></td>
+          <td>Includes tagging status per garment</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-post">POST</span></td>
+          <td><code>/api/v1/garments</code></td>
+          <td><span class="dest-closet">racky-closet</span></td>
+          <td>Returns 202; async tagging begins</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-get">GET</span></td>
+          <td><code>/api/v1/garments/:id</code></td>
+          <td><span class="dest-closet">racky-closet</span></td>
+          <td>Includes tags + body zones if tagged</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-put">PUT</span></td>
+          <td><code>/api/v1/garments/:id</code></td>
+          <td><span class="dest-closet">racky-closet</span></td>
+          <td>Name, layer overrides</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-delete">DELETE</span></td>
+          <td><code>/api/v1/garments/:id</code></td>
+          <td><span class="dest-closet">racky-closet</span></td>
+          <td>Publishes garment.deleted event</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-get">GET</span></td>
+          <td><code>/api/v1/tags</code></td>
+          <td><span class="dest-closet">racky-closet</span></td>
+          <td>All known tags (for UI dropdowns)</td>
+        </tr>
+
+        <tr style="border-top:2px solid #1e293b;">
+          <td><span class="badge badge-post">POST</span></td>
+          <td><code>/api/v1/outfits/generate</code></td>
+          <td><span class="dest-stylist">racky-stylist</span></td>
+          <td>Uses local read model — no closet call</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-get">GET</span></td>
+          <td><code>/api/v1/outfits</code></td>
+          <td><span class="dest-stylist">racky-stylist</span></td>
+          <td>List saved outfits</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-post">POST</span></td>
+          <td><code>/api/v1/outfits</code></td>
+          <td><span class="dest-stylist">racky-stylist</span></td>
+          <td>Save a generated outfit</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-get">GET</span></td>
+          <td><code>/api/v1/outfits/:id</code></td>
+          <td><span class="dest-stylist">racky-stylist</span></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-delete">DELETE</span></td>
+          <td><code>/api/v1/outfits/:id</code></td>
+          <td><span class="dest-stylist">racky-stylist</span></td>
+          <td></td>
+        </tr>
+
+        <tr style="border-top:2px solid #1e293b;">
+          <td><span class="badge badge-get">GET</span></td>
+          <td><code>/ping</code></td>
+          <td>gateway</td>
+          <td>Health check</td>
+        </tr>
+        <tr>
+          <td>*</td>
+          <td><code>/*</code> (non-API)</td>
+          <td><span style="color:#06b6d4;">racky-lookbook</span></td>
+          <td>Static asset / SPA fallback</td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── KEY DESIGN NOTES ──────────────────────────────────────────── -->
+
+  <div class="section">
+    <div class="section-title">Key Design Decisions</div>
+    <table>
+      <thead>
+        <tr><th>Decision</th><th>Rationale</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>racky-stylist owns a garment read model</td>
+          <td>Consumes <code>garment.tagged</code> / <code>garment.deleted</code> to maintain local copies — outfit generation needs no runtime HTTP call to racky-closet, keeping services fully decoupled</td>
+        </tr>
+        <tr>
+          <td>Gateway never touches Kafka</td>
+          <td>Gateway is a thin HTTP router; event production is the responsibility of the domain service that owns the state change</td>
+        </tr>
+        <tr>
+          <td>user.deleted fans out</td>
+          <td>Cascade deletes (garments, outfits) are handled by each service consuming the event independently — no service orchestrates another's cleanup</td>
+        </tr>
+        <tr>
+          <td>Auth is synchronous</td>
+          <td>Login/register are inherently request-response — forcing them async adds latency and complexity with no benefit; EDA doesn't mean async everywhere</td>
+        </tr>
+        <tr>
+          <td>POST /garments returns 202</td>
+          <td>Tagging is async; frontend polls <code>GET /garments/:id</code> and reads the <code>status</code> field (pending → tagged) — eliminates the UX gap in the original design</td>
+        </tr>
+        <tr>
+          <td>racky-tagger has a DLQ</td>
+          <td>If Claude returns unparseable JSON or the API is down, the event goes to a dead letter queue for retry/alerting rather than silently dropping</td>
+        </tr>
+        <tr>
+          <td>Consumers must be idempotent</td>
+          <td>Kafka at-least-once delivery means <code>garment.tagged</code> may arrive twice — upsert logic in racky-closet and racky-stylist prevents duplicate state</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── LEGEND ────────────────────────────────────────────────────── -->
+
+  <div class="section">
+    <div class="section-title">Legend</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div> racky-gateway</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#06b6d4;"></div> racky-lookbook</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div> racky-accounts</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#10b981;"></div> racky-closet</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div> racky-stylist</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div> racky-tagger</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#475569;"></div> external</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f97316;border-radius:0;"></div> Kafka</div>
+    </div>
+  </div>
+
+</body>
+</html>
